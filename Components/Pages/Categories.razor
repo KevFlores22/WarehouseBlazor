@@ -1,0 +1,53 @@
+﻿@page "/categories"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Categorias</h3>
+
+@if (categories == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre Categoria</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var categories in categories)
+            {
+                <tr>
+                    <td>@categories.CategoryName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject CategoriesService categoriesService
+@code {
+    private List<CategoriesResponse> categories;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            categories = await categoriesService.GetCategories();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

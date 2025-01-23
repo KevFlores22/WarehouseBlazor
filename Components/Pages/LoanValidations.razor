@@ -1,0 +1,63 @@
+﻿@page "/loanValidations"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Validacion de prestamo</h3>
+
+@if (loanValidations == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Validacion</th>
+                <th>Observaciones</th>
+                <th>Es Aprobado</th>
+                <th>Entrega</th>
+                <th>Devuelto</th>
+                <th>Nombre Usuario</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var loanValidation in loanValidations)
+            {
+                <tr>
+                    <td>@loanValidation.ValidationDate</td>
+                    <td>@loanValidation.Observations</td>
+                    <td>@loanValidation.IsApproved</td>
+                    <td>@loanValidation.Loan.DepartureDate</td>
+                    <td>@loanValidation.Loan.ReturnDate</td>
+                    <td>@loanValidation.User.UserName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject LoanValidationService loanValidationService
+@code {
+    private List<LoanValidationResponse> loanValidations;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loanValidations = await loanValidationService.GetLoanValidations();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

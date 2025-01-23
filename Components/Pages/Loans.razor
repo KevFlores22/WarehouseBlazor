@@ -1,0 +1,61 @@
+﻿@page "/loans"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Prestamos</h3>
+
+@if (loans == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Entrega</th>
+                <th>Devuelto</th>
+                <th>Bodeguero</th>
+                <th>Estado</th>
+                <th>Usuario</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var loan in loans)
+            {
+                <tr>
+                    <td>@loan.DepartureDate</td>
+                    <td>@loan.ReturnDate</td>
+                    <td>@loan.Grocer.UserName</td>
+                    <td>@loan.Status.StatusName</td>
+                    <td>@loan.User.UserName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject LoanService loanService
+@code {
+    private List<LoanResponse> loans;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            loans = await loanService.GetLoans();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

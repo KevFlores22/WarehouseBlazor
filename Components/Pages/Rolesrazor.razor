@@ -1,0 +1,53 @@
+﻿@page "/roles"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Roles</h3>
+
+@if (roles == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre del Rol</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var role in roles)
+            {
+                <tr>
+                    <td>@role.RolName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject RoleService roleService
+@code {
+    private List<RoleResponse> roles;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            roles = await roleService.GetRoles();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

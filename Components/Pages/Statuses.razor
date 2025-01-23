@@ -1,0 +1,53 @@
+﻿@page "/statuses"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Estados</h3>
+
+@if (statuses == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var status in statuses)
+            {
+                <tr>
+                    <td>@status.StatusName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject StatusService statusService
+@code {
+    private List<StatusResponse> statuses;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            statuses = await statusService.GetStatuses();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

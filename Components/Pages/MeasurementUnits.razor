@@ -1,0 +1,53 @@
+﻿@page "/measurementUnits"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Unidad de medida</h3>
+
+@if (measurementUnits == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre de Unidad de Medida</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var measurementUnit in measurementUnits)
+            {
+                <tr>
+                    <td>@measurementUnit.MeasurementUnitName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject MeasurementUnitService measurementUnitService
+@code {
+    private List<MeasurementUnitResponse> measurementUnits;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            measurementUnits = await measurementUnitService.GetMeasurementUnits();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

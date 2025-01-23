@@ -1,0 +1,53 @@
+﻿@page "/brands"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Marcas</h3>
+
+@if (brands == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var brand in brands)
+            {
+                <tr>
+                    <td>@brand.BrandName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject BrandService brandService
+@code {
+    private List<BrandResponse> brands;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            brands = await brandService.GetBrands();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}

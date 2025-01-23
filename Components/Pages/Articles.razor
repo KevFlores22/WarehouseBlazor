@@ -1,0 +1,70 @@
+﻿@page "/articles"
+@using WarehouseBlazor.DTO
+@using WarehouseBlazor.Services
+
+<h3>Articulos</h3>
+
+@if (articles == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Codigo</th>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Es Retornable</th>
+                <th>Marca</th>
+                <th>Categoria</th>
+                <th>Estado</th>
+                <th>Unidad de medida</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var article in articles)
+            {
+                <tr>
+                    <td>@article.UniqueCode</td>
+                    <td>@article.ArticleName</td>
+                    <td>@article.Descriptions</td>
+                    <td>@article.Stock</td>
+                    <td>@article.IsReturnable</td>
+                    <td>@article.Brand.BrandName</td>
+                    <td>@article.Category.CategoryName</td>
+                    <td>@article.Status.StatusName</td>
+                    <td>@article.Unit.MeasurementUnitName</td>
+                    @* <td>@(article.StatusId == 1 ? "Activo" : article.StatusId == 2 ? "Inactivo" : "Desconocido")</td> *@
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@inject ArticleService articleService
+@code {
+    private List<ArticleResponse> articles;
+    private string errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            articles = await articleService.GetArticles();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+}
