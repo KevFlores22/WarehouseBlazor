@@ -1,53 +1,233 @@
 ﻿@page "/brands"
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
-
-<h3>Marcas</h3>
-
-@if (brands == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var brand in brands)
-            {
-                <tr>
-                    <td>@brand.BrandName</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
 @inject BrandService brandService
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Gestión de Marcas</h2>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Formulario para agregar nueva marca -->
+    <div class="card shadow-sm p-3 mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Agregar Nueva Marca</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Nombre de la marca" @bind="newBrandName" />
+                <button class="btn btn-primary" @onclick="AddBrand">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buscador -->
+    <div class="mb-4">
+        <input type="text" class="form-control" placeholder="Buscar marca..." @bind="searchQuery" @oninput="FilterBrands" />
+    </div>
+
+    @if (brands == null)
+    {
+        <p class="text-center text-muted"><em>Cargando...</em></p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var brand in filteredBrands)
+                    {
+                        <tr>
+                            <td>
+                                @if (editingBrandId == brand.BrandId)
+                                {
+                                    <input type="text" class="form-control" @bind="editingBrandName" />
+                                }
+                                else
+                                {
+                                    @brand.BrandName
+                                }
+                            </td>
+                            <td>
+                                @if (editingBrandId == brand.BrandId)
+                                {
+                                    <button class="btn btn-success btn-sm me-2" @onclick="SaveEdit">Guardar</button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Cancelar</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-warning btn-sm me-2" @onclick="() => EditBrand(brand)">Editar</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => DeleteBrand(brand.BrandId)">Eliminar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
 @code {
-    private List<BrandResponse> brands;
-    private string errorMessage;
+    private List<BrandResponse> brands = new();
+    private List<BrandResponse> filteredBrands = new();
+    private string newBrandName = string.Empty;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private int? editingBrandId = null;
+    private string editingBrandName = string.Empty;
+    private string searchQuery = string.Empty;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadBrands();
+    }
+
+    private async Task LoadBrands()
     {
         try
         {
             brands = await brandService.GetBrands();
+            filteredBrands = brands; // Inicialmente, mostramos todas las marcas
+            errorMessage = string.Empty;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = $"Error al cargar marcas: {ex.Message}";
         }
     }
 
+    private void FilterBrands()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredBrands = brands; // Si no hay texto en el buscador, mostramos todas las marcas
+        }
+        else
+        {
+            filteredBrands = brands.Where(b => b.BrandName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+    private async Task AddBrand()
+    {
+        if (string.IsNullOrWhiteSpace(newBrandName))
+        {
+            errorMessage = "El nombre de la marca no puede estar vacío.";
+            successMessage = string.Empty;
+            return;
+        }
+
+        var brandRequest = new BrandRequest { BrandName = newBrandName };
+
+        try
+        {
+            bool isSuccess = await brandService.CreateBrand(brandRequest);
+            if (isSuccess)
+            {
+                successMessage = "Marca agregada correctamente.";
+                errorMessage = string.Empty;
+                newBrandName = string.Empty;
+                await LoadBrands();
+            }
+            else
+            {
+                errorMessage = "Error al agregar la marca.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al agregar marca: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+
+    private void EditBrand(BrandResponse brand)
+    {
+        editingBrandId = brand.BrandId;
+        editingBrandName = brand.BrandName;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingBrandId == null || string.IsNullOrWhiteSpace(editingBrandName))
+        {
+            errorMessage = "El nombre de la marca no puede estar vacío.";
+            return;
+        }
+
+        var brandRequest = new BrandRequest { BrandName = editingBrandName };
+
+        try
+        {
+            bool isSuccess = await brandService.UpdateBrand((int)editingBrandId, brandRequest);
+            if (isSuccess)
+            {
+                successMessage = "Marca actualizada correctamente.";
+                errorMessage = string.Empty;
+                editingBrandId = null;
+                editingBrandName = string.Empty;
+                await LoadBrands();
+            }
+            else
+            {
+                errorMessage = "Error al actualizar la marca.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al actualizar marca: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingBrandId = null;
+        editingBrandName = string.Empty;
+    }
+
+    private async Task DeleteBrand(int brandId)
+    {
+        try
+        {
+            bool isSuccess = await brandService.DeleteBrand(brandId);
+            if (isSuccess)
+            {
+                successMessage = "Marca eliminada correctamente.";
+                errorMessage = string.Empty;
+                await LoadBrands();
+            }
+            else
+            {
+                errorMessage = "Error al eliminar la marca.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al eliminar marca: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
 }

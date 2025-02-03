@@ -34,7 +34,7 @@
     }
     public class ArticleRequest
     {
-        //public int ArticleId { get; set; }
+        public int ArticleId { get; set; }
 
         public string UniqueCode { get; set; } = null!;
 

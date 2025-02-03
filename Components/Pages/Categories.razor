@@ -1,53 +1,233 @@
 ﻿@page "/categories"
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
-
-<h3>Categorias</h3>
-
-@if (categories == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre Categoria</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var categories in categories)
-            {
-                <tr>
-                    <td>@categories.CategoryName</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
 @inject CategoriesService categoriesService
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Gestión de Categorías</h2>
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @successMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @errorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <!-- Formulario para agregar nueva categoría -->
+    <div class="card shadow-sm p-3 mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Agregar Nueva Categoría</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" placeholder="Nombre de la categoría" @bind="newCategoryName" />
+                <button class="btn btn-primary" @onclick="AddCategory">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buscador -->
+    <div class="mb-4">
+        <input type="text" class="form-control" placeholder="Buscar categoría..." @bind="searchQuery" @oninput="FilterCategories" />
+    </div>
+
+    @if (categories == null)
+    {
+        <p class="text-center text-muted"><em>Cargando...</em></p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered text-center">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var category in filteredCategories)
+                    {
+                        <tr>
+                            <td>
+                                @if (editingCategoryId == category.CategoryId)
+                                {
+                                    <input type="text" class="form-control" @bind="editingCategoryName" />
+                                }
+                                else
+                                {
+                                    @category.CategoryName
+                                }
+                            </td>
+                            <td>
+                                @if (editingCategoryId == category.CategoryId)
+                                {
+                                    <button class="btn btn-success btn-sm me-2" @onclick="SaveEdit">Guardar</button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Cancelar</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-warning btn-sm me-2" @onclick="() => EditCategory(category)">Editar</button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => DeleteCategory(category.CategoryId)">Eliminar</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
 @code {
-    private List<CategoriesResponse> categories;
-    private string errorMessage;
+    private List<CategoriesResponse> categories = new();
+    private List<CategoriesResponse> filteredCategories = new();
+    private string newCategoryName = string.Empty;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private int? editingCategoryId = null;
+    private string editingCategoryName = string.Empty;
+    private string searchQuery = string.Empty;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
     {
         try
         {
             categories = await categoriesService.GetCategories();
+            filteredCategories = categories; // Inicialmente, mostramos todas las categorías
+            errorMessage = string.Empty;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = $"Error al cargar categorías: {ex.Message}";
         }
     }
 
-}
+    private void FilterCategories()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredCategories = categories; // Si no hay texto en el buscador, mostramos todas las categorías
+        }
+        else
+        {
+            filteredCategories = categories.Where(c => c.CategoryName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+    }
+
+    private async Task AddCategory()
+    {
+        if (string.IsNullOrWhiteSpace(newCategoryName))
+        {
+            errorMessage = "El nombre de la categoría no puede estar vacío.";
+            successMessage = string.Empty;
+            return;
+        }
+
+        var categoryRequest = new CategoriesRequest { CategoryName = newCategoryName };
+
+        try
+        {
+            bool isSuccess = await categoriesService.CreateCategory(categoryRequest);
+            if (isSuccess)
+            {
+                successMessage = "Categoría agregada correctamente.";
+                errorMessage = string.Empty;
+                newCategoryName = string.Empty;
+                await LoadCategories();
+            }
+            else
+            {
+                errorMessage = "Error al agregar la categoría.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al agregar categoría: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+
+    private void EditCategory(CategoriesResponse category)
+    {
+        editingCategoryId = category.CategoryId;
+        editingCategoryName = category.CategoryName;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingCategoryId == null || string.IsNullOrWhiteSpace(editingCategoryName))
+        {
+            errorMessage = "El nombre de la categoría no puede estar vacío.";
+            return;
+        }
+
+        var categoryRequest = new CategoriesRequest { CategoryName = editingCategoryName };
+
+        try
+        {
+            bool isSuccess = await categoriesService.UpdateCategory((int)editingCategoryId, categoryRequest);
+            if (isSuccess)
+            {
+                successMessage = "Categoría actualizada correctamente.";
+                errorMessage = string.Empty;
+                editingCategoryId = null;
+                editingCategoryName = string.Empty;
+                await LoadCategories();
+            }
+            else
+            {
+                errorMessage = "Error al actualizar la categoría.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al actualizar categoría: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingCategoryId = null;
+        editingCategoryName = string.Empty;
+    }
+
+    private async Task DeleteCategory(int categoryId)
+    {
+        try
+        {
+            bool isSuccess = await categoriesService.DeleteCategory(categoryId);
+            if (isSuccess)
+            {
+                successMessage = "Categoría eliminada correctamente.";
+                errorMessage = string.Empty;
+                await LoadCategories();
+            }
+            else
+            {
+                errorMessage = "Error al eliminar la categoría.";
+                successMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error al eliminar categoría: {ex.Message}";
+            successMessage = string.Empty;
+        }
+    }
+    }
