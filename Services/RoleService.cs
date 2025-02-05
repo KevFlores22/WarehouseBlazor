@@ -1,5 +1,7 @@
-﻿using WarehouseBlazor.DTO;
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using WarehouseBlazor.DTO;
+
 namespace WarehouseBlazor.Services
 {
     public class RoleService
@@ -13,31 +15,81 @@ namespace WarehouseBlazor.Services
             _authService = authService;
         }
 
+        private async Task<bool> SetAuthorizationHeader()
+        {
+            var token = await _authService.GetToken();
+            if (string.IsNullOrEmpty(token))
+                return false;
+
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return true;
+        }
+
         public async Task<List<RoleResponse>> GetRoles()
         {
+            if (!await SetAuthorizationHeader())
+                throw new InvalidOperationException("Token inválido. Debe iniciar sesión.");
 
             try
             {
-                var token = await _authService.GetToken();
-
-                if (string.IsNullOrEmpty(token))
-                {
-                    throw new InvalidOperationException("El token es nulo o invalido. Iniciar Sesión");
-                }
-
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                var response = await _httpClient.GetFromJsonAsync<List<RoleResponse>>("api/roles");
-
-                return response;
-
+                return await _httpClient.GetFromJsonAsync<List<RoleResponse>>("api/roles")
+                    ?? new List<RoleResponse>();
             }
-            catch (HttpRequestException ex)
+            catch (HttpRequestException)
             {
-                throw new Exception("Error al obtener los roles. Revisar conexión a internet.");
+                throw new Exception("Error de conexión. Verifique su internet.");
             }
-            catch (Exception ex)
+            catch
             {
-                throw new Exception("Ha ocurrido un error al obtener los roles.");
+                throw new Exception("Error al obtener los roles.");
+            }
+        }
+
+        public async Task<bool> CreateRole(RoleRequest roleRequest)
+        {
+            if (!await SetAuthorizationHeader())
+                return false;
+
+            try
+            {
+                var response = await _httpClient.PostAsJsonAsync("api/roles", roleRequest);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateRole(int roleId, RoleRequest roleRequest)
+        {
+            if (!await SetAuthorizationHeader())
+                return false;
+
+            try
+            {
+                var response = await _httpClient.PutAsJsonAsync($"api/roles/{roleId}", roleRequest);
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteRole(int roleId)
+        {
+            if (!await SetAuthorizationHeader())
+                return false;
+
+            try
+            {
+                var response = await _httpClient.DeleteAsync($"api/roles/{roleId}");
+                return response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                return false;
             }
         }
     }
