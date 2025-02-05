@@ -1,53 +1,338 @@
 ﻿@page "/roles"
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
-
-<h3>Roles</h3>
-
-@if (roles == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre del Rol</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var role in roles)
-            {
-                <tr>
-                    <td>@role.RolName</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
 @inject RoleService roleService
+@inject IJSRuntime JSRuntime
+
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Gestión de Roles</h2>
+
+    <!-- Alertas -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                @successMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                @errorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </div>
+
+    <!-- Sección superior: Formulario y búsqueda -->
+    <div class="row g-4 mb-4">
+        <!-- Tarjeta de agregar rol -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Agregar Nuevo Rol</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Nombre del rol"
+                               @bind="newRole.RolName"
+                               @onkeypress="HandleKeyPress" />
+                        <button class="btn btn-primary" @onclick="CreateNewRole">
+                            <i class="bi bi-save me-2"></i>Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta de búsqueda -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="card-title mb-0"><i class="bi bi-search me-2"></i>Buscar Roles</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Escribe para filtrar..."
+                               @bind="searchQuery"
+                               @oninput="FilterRoles" />
+                        <button class="btn btn-outline-secondary" @onclick="() => FilterRoles()">
+                            <i class="bi bi-funnel"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de roles -->
+    @if (roles == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else if (!roles.Any())
+    {
+        <p class="text-center">No hay roles registrados</p>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="w-75">Nombre del Rol</th>
+                                <th class="w-25">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var role in filteredRoles)
+                            {
+                                <tr>
+                                    <td class="align-middle">
+                                        @if (editingRoleId == role.RoleId)
+                                        {
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   @bind="editingRoleName"
+                                                   @onkeypress="HandleEditKeyPress" />
+                                        }
+                                        else
+                                        {
+                                            @role.RolName
+                                        }
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="d-flex gap-2">
+                                            @if (editingRoleId == role.RoleId)
+                                            {
+                                                <button class="btn btn-success btn-sm" @onclick="SaveEdit">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                                <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-warning btn-sm"
+                                                        @onclick="() => StartEdit(role)"
+                                                        title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        @onclick="() => ShowDeleteModal(role.RoleId)"
+                                                        title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal de confirmación de eliminación -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar permanentemente este rol?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
     private List<RoleResponse> roles;
+    private List<RoleResponse> filteredRoles;
+    private string searchQuery = "";
+    private string successMessage;
     private string errorMessage;
+    private int? editingRoleId;
+    private string editingRoleName;
+    private RoleRequest newRole = new RoleRequest();
+    private int? roleIdToDelete;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadRoles();
+    }
+
+    private async Task LoadRoles()
     {
         try
         {
             roles = await roleService.GetRoles();
+            FilterRoles();
+            errorMessage = null;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            errorMessage = $"Error al cargar roles: {ex.Message}";
         }
     }
 
+    private void FilterRoles()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredRoles = roles?.ToList();
+            return;
+        }
+
+        var query = searchQuery.ToLower();
+        filteredRoles = roles?
+            .Where(r => r.RolName.ToLower().Contains(query))
+            .ToList();
+    }
+
+    private async Task CreateNewRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRole.RolName))
+        {
+            errorMessage = "El nombre del rol es requerido";
+            return;
+        }
+
+        try
+        {
+            var success = await roleService.CreateRole(newRole);
+            if (success)
+            {
+                await LoadRoles();
+                successMessage = "Rol creado exitosamente";
+                newRole.RolName = "";
+            }
+            else
+            {
+                errorMessage = "Error al crear el rol";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private void StartEdit(RoleResponse role)
+    {
+        editingRoleId = role.RoleId;
+        editingRoleName = role.RolName;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingRoleId == null || string.IsNullOrWhiteSpace(editingRoleName))
+        {
+            errorMessage = "El nombre del rol no puede estar vacío.";
+            return;
+        }
+
+        try
+        {
+            var roleRequest = new RoleRequest { RolName = editingRoleName };
+            var success = await roleService.UpdateRole(editingRoleId.Value, roleRequest);
+
+            if (success)
+            {
+                await LoadRoles();  // Asegura que la lista se actualiza
+                successMessage = "Rol actualizado correctamente";
+            }
+            else
+            {
+                errorMessage = "Error al actualizar el rol";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+
+        CancelEdit();  // Limpia los valores después de la edición
+    }
+
+
+    private void CancelEdit()
+    {
+        editingRoleId = null;
+        editingRoleName = "";
+    }
+
+    private void ShowDeleteModal(int roleId)
+    {
+        roleIdToDelete = roleId;
+        JSRuntime.InvokeVoidAsync("eval", $"document.getElementById('deleteModal').classList.add('show')");
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (roleIdToDelete == null)
+        {
+            errorMessage = "No se ha seleccionado un rol para eliminar.";
+            return;
+        }
+
+        try
+        {
+            var success = await roleService.DeleteRole(roleIdToDelete.Value);
+            if (success)
+            {
+                await LoadRoles(); // Actualiza la lista después de eliminar
+                successMessage = "Rol eliminado correctamente";
+            }
+            else
+            {
+                errorMessage = "Error al eliminar el rol";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+
+        roleIdToDelete = null; // Limpia la variable después de eliminar
+        await JSRuntime.InvokeVoidAsync("eval", "var modal = new bootstrap.Modal(document.getElementById('deleteModal')); modal.hide();");
+    }
+
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") CreateNewRole();
+    }
+
+    private void HandleEditKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+    }
 }

@@ -2,88 +2,171 @@
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
 @inject CategoriesService categoriesService
+@inject IJSRuntime JSRuntime
 
 <div class="container mt-4">
     <h2 class="text-center mb-4">Gestión de Categorías</h2>
 
-    @if (!string.IsNullOrEmpty(successMessage))
-    {
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            @successMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    }
+    <!-- Alertas -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                @successMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                @errorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </div>
 
-    @if (!string.IsNullOrEmpty(errorMessage))
-    {
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            @errorMessage
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <!-- Sección superior: Formulario y búsqueda -->
+    <div class="row g-4 mb-4">
+        <!-- Tarjeta de agregar categoría -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Agregar Nueva Categoría</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Nombre de la categoría"
+                               @bind="newCategoryName"
+                               @onkeypress="HandleKeyPress" />
+                        <button class="btn btn-primary" @onclick="AddCategory">
+                            <i class="bi bi-save me-2"></i>Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-    }
 
-    <!-- Formulario para agregar nueva categoría -->
-    <div class="card shadow-sm p-3 mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Agregar Nueva Categoría</h5>
-            <div class="input-group">
-                <input type="text" class="form-control" placeholder="Nombre de la categoría" @bind="newCategoryName" />
-                <button class="btn btn-primary" @onclick="AddCategory">Agregar</button>
+        <!-- Tarjeta de búsqueda -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="card-title mb-0"><i class="bi bi-search me-2"></i>Buscar Categorías</h5>
+                </div>
+                <div class="card-body">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Escribe para filtrar..."
+                               @bind="searchQuery"
+                               @oninput="FilterCategories" />
+                        <button class="btn btn-outline-secondary" @onclick="() => FilterCategories()">
+                            <i class="bi bi-funnel"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Buscador -->
-    <div class="mb-4">
-        <input type="text" class="form-control" placeholder="Buscar categoría..." @bind="searchQuery" @oninput="FilterCategories" />
-    </div>
-
+    <!-- Tabla de categorías -->
     @if (categories == null)
     {
-        <p class="text-center text-muted"><em>Cargando...</em></p>
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
     }
     else
     {
-        <div class="table-responsive">
-            <table class="table table-hover table-bordered text-center">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var category in filteredCategories)
-                    {
-                        <tr>
-                            <td>
-                                @if (editingCategoryId == category.CategoryId)
-                                {
-                                    <input type="text" class="form-control" @bind="editingCategoryName" />
-                                }
-                                else
-                                {
-                                    @category.CategoryName
-                                }
-                            </td>
-                            <td>
-                                @if (editingCategoryId == category.CategoryId)
-                                {
-                                    <button class="btn btn-success btn-sm me-2" @onclick="SaveEdit">Guardar</button>
-                                    <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Cancelar</button>
-                                }
-                                else
-                                {
-                                    <button class="btn btn-warning btn-sm me-2" @onclick="() => EditCategory(category)">Editar</button>
-                                    <button class="btn btn-danger btn-sm" @onclick="() => DeleteCategory(category.CategoryId)">Eliminar</button>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="w-75">Nombre de la Categoría</th>
+                                <th class="w-25">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var category in filteredCategories)
+                            {
+                                <tr>
+                                    <td class="align-middle">
+                                        @if (editingCategoryId == category.CategoryId)
+                                        {
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   @bind="editingCategoryName"
+                                                   @onkeypress="HandleEditKeyPress" />
+                                        }
+                                        else
+                                        {
+                                            @category.CategoryName
+                                        }
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="d-flex gap-2">
+                                            @if (editingCategoryId == category.CategoryId)
+                                            {
+                                                <button class="btn btn-success btn-sm" @onclick="SaveEdit">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                                <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-warning btn-sm"
+                                                        @onclick="() => EditCategory(category)"
+                                                        title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        @onclick="() => ShowDeleteModal(category.CategoryId)"
+                                                        title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     }
+
+    <!-- Modal de confirmación de eliminación -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar permanentemente esta categoría?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 @code {
@@ -95,6 +178,7 @@
     private int? editingCategoryId = null;
     private string editingCategoryName = string.Empty;
     private string searchQuery = string.Empty;
+    private int? categoryIdToDelete = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -106,58 +190,43 @@
         try
         {
             categories = await categoriesService.GetCategories();
-            filteredCategories = categories; // Inicialmente, mostramos todas las categorías
+            filteredCategories = categories;
             errorMessage = string.Empty;
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al cargar categorías: {ex.Message}";
+            HandleError($"Error al cargar categorías: {ex.Message}");
         }
     }
 
     private void FilterCategories()
     {
-        if (string.IsNullOrWhiteSpace(searchQuery))
-        {
-            filteredCategories = categories; // Si no hay texto en el buscador, mostramos todas las categorías
-        }
-        else
-        {
-            filteredCategories = categories.Where(c => c.CategoryName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
+        filteredCategories = string.IsNullOrWhiteSpace(searchQuery)
+            ? categories
+            : categories.Where(c => c.CategoryName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     private async Task AddCategory()
     {
         if (string.IsNullOrWhiteSpace(newCategoryName))
         {
-            errorMessage = "El nombre de la categoría no puede estar vacío.";
-            successMessage = string.Empty;
+            HandleError("El nombre de la categoría no puede estar vacío");
             return;
         }
 
-        var categoryRequest = new CategoriesRequest { CategoryName = newCategoryName };
-
         try
         {
-            bool isSuccess = await categoriesService.CreateCategory(categoryRequest);
-            if (isSuccess)
+            var result = await categoriesService.CreateCategory(new CategoriesRequest { CategoryName = newCategoryName });
+            if (result)
             {
-                successMessage = "Categoría agregada correctamente.";
-                errorMessage = string.Empty;
                 newCategoryName = string.Empty;
+                HandleSuccess("Categoría agregada correctamente");
                 await LoadCategories();
-            }
-            else
-            {
-                errorMessage = "Error al agregar la categoría.";
-                successMessage = string.Empty;
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al agregar categoría: {ex.Message}";
-            successMessage = string.Empty;
+            HandleError($"Error al crear categoría: {ex.Message}");
         }
     }
 
@@ -169,35 +238,27 @@
 
     private async Task SaveEdit()
     {
-        if (editingCategoryId == null || string.IsNullOrWhiteSpace(editingCategoryName))
+        if (!editingCategoryId.HasValue || string.IsNullOrWhiteSpace(editingCategoryName))
         {
-            errorMessage = "El nombre de la categoría no puede estar vacío.";
+            HandleError("El nombre no puede estar vacío");
             return;
         }
 
-        var categoryRequest = new CategoriesRequest { CategoryName = editingCategoryName };
-
         try
         {
-            bool isSuccess = await categoriesService.UpdateCategory((int)editingCategoryId, categoryRequest);
-            if (isSuccess)
+            var result = await categoriesService.UpdateCategory(editingCategoryId.Value,
+                new CategoriesRequest { CategoryName = editingCategoryName });
+
+            if (result)
             {
-                successMessage = "Categoría actualizada correctamente.";
-                errorMessage = string.Empty;
                 editingCategoryId = null;
-                editingCategoryName = string.Empty;
+                HandleSuccess("Categoría actualizada correctamente");
                 await LoadCategories();
-            }
-            else
-            {
-                errorMessage = "Error al actualizar la categoría.";
-                successMessage = string.Empty;
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al actualizar categoría: {ex.Message}";
-            successMessage = string.Empty;
+            HandleError($"Error al actualizar categoría: {ex.Message}");
         }
     }
 
@@ -211,23 +272,56 @@
     {
         try
         {
-            bool isSuccess = await categoriesService.DeleteCategory(categoryId);
-            if (isSuccess)
+            var result = await categoriesService.DeleteCategory(categoryId);
+            if (result)
             {
-                successMessage = "Categoría eliminada correctamente.";
-                errorMessage = string.Empty;
+                HandleSuccess("Categoría eliminada correctamente");
                 await LoadCategories();
-            }
-            else
-            {
-                errorMessage = "Error al eliminar la categoría.";
-                successMessage = string.Empty;
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error al eliminar categoría: {ex.Message}";
-            successMessage = string.Empty;
+            HandleError($"Error al eliminar categoría: {ex.Message}");
         }
     }
+
+    private async void ShowDeleteModal(int categoryId)
+    {
+        categoryIdToDelete = categoryId;
+        await JSRuntime.InvokeVoidAsync("showModal", "deleteModal");
     }
+
+    private async Task ConfirmDelete()
+    {
+        if (categoryIdToDelete.HasValue)
+        {
+            await DeleteCategory(categoryIdToDelete.Value);
+            await JSRuntime.InvokeVoidAsync("hideModal", "deleteModal");
+            categoryIdToDelete = null;
+        }
+    }
+
+    private void HandleSuccess(string message)
+    {
+        successMessage = message;
+        errorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleError(string message)
+    {
+        errorMessage = message;
+        successMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddCategory();
+    }
+
+    private void HandleEditKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+    }
+}
