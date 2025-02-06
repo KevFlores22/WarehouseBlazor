@@ -1,53 +1,291 @@
 ﻿@page "/measurementUnits"
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
-
-<h3>Unidad de medida</h3>
-
-@if (measurementUnits == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre de Unidad de Medida</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var measurementUnit in measurementUnits)
-            {
-                <tr>
-                    <td>@measurementUnit.MeasurementUnitName</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
 @inject MeasurementUnitService measurementUnitService
+@inject IJSRuntime JSRuntime
+
+<div class="container mt-4">
+    <h3 class="text-center mb-4">Gestión de Unidades de Medida</h3>
+
+    <!-- Alertas -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                @successMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                @errorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </div>
+
+    <!-- Formulario para agregar unidad de medida -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Agregar Nueva Unidad de Medida</h5>
+        </div>
+        <div class="card-body">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Nombre de la unidad de medida"
+                       @bind="newMeasurementUnitName"
+                       @onkeypress="HandleKeyPress" />
+                <button class="btn btn-primary" @onclick="AddMeasurementUnit">
+                    <i class="bi bi-save me-2"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de unidades de medida -->
+    @if (measurementUnits == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre de la Unidad de Medida</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var unit in measurementUnits)
+                            {
+                                <tr>
+                                    <td class="align-middle">
+                                        @if (editingUnitId == unit.UnitId)
+                                        {
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   @bind="editingUnitName"
+                                                   @onkeypress="HandleEditKeyPress" />
+                                        }
+                                        else
+                                        {
+                                            @unit.MeasurementUnitName
+                                        }
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="d-flex gap-2">
+                                            @if (editingUnitId == unit.UnitId)
+                                            {
+                                                <button class="btn btn-success btn-sm" @onclick="SaveEdit">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                                <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-warning btn-sm"
+                                                        @onclick="() => EditUnit(unit)"
+                                                        title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        @onclick="() => ShowDeleteModal(unit.UnitId)"
+                                                        title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal de confirmación de eliminación -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar permanentemente esta unidad de medida?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
-    private List<MeasurementUnitResponse> measurementUnits;
-    private string errorMessage;
+    private List<MeasurementUnitResponse> measurementUnits = new();
+    private string newMeasurementUnitName = string.Empty;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private int? editingUnitId = null;
+    private string editingUnitName = string.Empty;
+    private int? unitIdToDelete = null;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadMeasurementUnits();
+    }
+
+    private async Task LoadMeasurementUnits()
     {
         try
         {
             measurementUnits = await measurementUnitService.GetMeasurementUnits();
+            errorMessage = string.Empty;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            HandleError($"Error al cargar unidades de medida: {ex.Message}");
         }
     }
 
+    private async Task AddMeasurementUnit()
+    {
+        if (string.IsNullOrWhiteSpace(newMeasurementUnitName))
+        {
+            HandleError("El nombre de la unidad de medida no puede estar vacío");
+            return;
+        }
+
+        try
+        {
+            var result = await measurementUnitService.CreateMeasurementUnit(new MeasurementUnitRequest { MeasurementUnitName = newMeasurementUnitName });
+            if (result)
+            {
+                newMeasurementUnitName = string.Empty;
+                HandleSuccess("Unidad de medida agregada correctamente");
+                await LoadMeasurementUnits();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al crear unidad de medida: {ex.Message}");
+        }
+    }
+
+    private void EditUnit(MeasurementUnitResponse unit)
+    {
+        editingUnitId = unit.UnitId;
+        editingUnitName = unit.MeasurementUnitName;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (!editingUnitId.HasValue || string.IsNullOrWhiteSpace(editingUnitName))
+        {
+            HandleError("El nombre no puede estar vacío");
+            return;
+        }
+
+        try
+        {
+            var result = await measurementUnitService.UpdateMeasurementUnit(editingUnitId.Value,
+                new MeasurementUnitRequest { MeasurementUnitName = editingUnitName });
+
+            if (result)
+            {
+                editingUnitId = null;
+                HandleSuccess("Unidad de medida actualizada correctamente");
+                await LoadMeasurementUnits();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al actualizar unidad de medida: {ex.Message}");
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingUnitId = null;
+        editingUnitName = string.Empty;
+    }
+
+    private async Task DeleteMeasurementUnit(int unitId)
+    {
+        try
+        {
+            var result = await measurementUnitService.DeleteMeasurementUnit(unitId);
+            if (result)
+            {
+                HandleSuccess("Unidad de medida eliminada correctamente");
+                await LoadMeasurementUnits();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al eliminar unidad de medida: {ex.Message}");
+        }
+    }
+
+    private async void ShowDeleteModal(int unitId)
+    {
+        unitIdToDelete = unitId;
+        await JSRuntime.InvokeVoidAsync("showModal", "deleteModal");
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (unitIdToDelete.HasValue)
+        {
+            await DeleteMeasurementUnit(unitIdToDelete.Value);
+            await JSRuntime.InvokeVoidAsync("hideModal", "deleteModal");
+            unitIdToDelete = null;
+        }
+    }
+
+    private void HandleSuccess(string message)
+    {
+        successMessage = message;
+        errorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleError(string message)
+    {
+        errorMessage = message;
+        successMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddMeasurementUnit();
+    }
+
+    private void HandleEditKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+    }
 }
