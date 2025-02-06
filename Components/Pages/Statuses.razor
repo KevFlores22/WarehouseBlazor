@@ -1,53 +1,291 @@
 ﻿@page "/statuses"
 @using WarehouseBlazor.DTO
 @using WarehouseBlazor.Services
-
-<h3>Estados</h3>
-
-@if (statuses == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre Estado</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var status in statuses)
-            {
-                <tr>
-                    <td>@status.StatusName</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <div class="alert alert-danger">@errorMessage</div>
-}
-
 @inject StatusService statusService
+@inject IJSRuntime JSRuntime
+
+<div class="container mt-4">
+    <h3 class="text-center mb-4">Gestión de Estados</h3>
+
+    <!-- Alertas -->
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle me-2"></i>
+                @successMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                @errorMessage
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </div>
+
+    <!-- Formulario para agregar estado -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0"><i class="bi bi-plus-circle me-2"></i>Agregar Nuevo Estado</h5>
+        </div>
+        <div class="card-body">
+            <div class="input-group">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Nombre del estado"
+                       @bind="newStatusName"
+                       @onkeypress="HandleKeyPress" />
+                <button class="btn btn-primary" @onclick="AddStatus">
+                    <i class="bi bi-save me-2"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de estados -->
+    @if (statuses == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre del Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var status in statuses)
+                            {
+                                <tr>
+                                    <td class="align-middle">
+                                        @if (editingStatusId == status.StatusId)
+                                        {
+                                            <input type="text"
+                                                   class="form-control form-control-sm"
+                                                   @bind="editingStatusName"
+                                                   @onkeypress="HandleEditKeyPress" />
+                                        }
+                                        else
+                                        {
+                                            @status.StatusName
+                                        }
+                                    </td>
+                                    <td class="align-middle">
+                                        <div class="d-flex gap-2">
+                                            @if (editingStatusId == status.StatusId)
+                                            {
+                                                <button class="btn btn-success btn-sm" @onclick="SaveEdit">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                                <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-warning btn-sm"
+                                                        @onclick="() => EditStatus(status)"
+                                                        title="Editar">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        @onclick="() => ShowDeleteModal(status.StatusId)"
+                                                        title="Eliminar">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Modal de confirmación de eliminación -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Eliminación</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    ¿Estás seguro de que deseas eliminar permanentemente este estado?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-2"></i>Cancelar
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDelete">
+                        <i class="bi bi-trash me-2"></i>Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
-    private List<StatusResponse> statuses;
-    private string errorMessage;
+    private List<StatusResponse> statuses = new();
+    private string newStatusName = string.Empty;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private int? editingStatusId = null;
+    private string editingStatusName = string.Empty;
+    private int? statusIdToDelete = null;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadStatuses();
+    }
+
+    private async Task LoadStatuses()
     {
         try
         {
             statuses = await statusService.GetStatuses();
+            errorMessage = string.Empty;
         }
         catch (Exception ex)
         {
-            errorMessage = ex.Message;
+            HandleError($"Error al cargar estados: {ex.Message}");
         }
     }
 
+    private async Task AddStatus()
+    {
+        if (string.IsNullOrWhiteSpace(newStatusName))
+        {
+            HandleError("El nombre del estado no puede estar vacío");
+            return;
+        }
+
+        try
+        {
+            var result = await statusService.CreateStatus(new StatusRequest { StatusName = newStatusName });
+            if (result)
+            {
+                newStatusName = string.Empty;
+                HandleSuccess("Estado agregado correctamente");
+                await LoadStatuses();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al crear estado: {ex.Message}");
+        }
+    }
+
+    private void EditStatus(StatusResponse status)
+    {
+        editingStatusId = status.StatusId;
+        editingStatusName = status.StatusName;
+    }
+
+    private async Task SaveEdit()
+    {
+        if (!editingStatusId.HasValue || string.IsNullOrWhiteSpace(editingStatusName))
+        {
+            HandleError("El nombre no puede estar vacío");
+            return;
+        }
+
+        try
+        {
+            var result = await statusService.UpdateStatus(editingStatusId.Value,
+                new StatusRequest { StatusName = editingStatusName });
+
+            if (result)
+            {
+                editingStatusId = null;
+                HandleSuccess("Estado actualizado correctamente");
+                await LoadStatuses();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al actualizar estado: {ex.Message}");
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingStatusId = null;
+        editingStatusName = string.Empty;
+    }
+
+    private async Task DeleteStatus(int statusId)
+    {
+        try
+        {
+            var result = await statusService.DeleteStatus(statusId);
+            if (result)
+            {
+                HandleSuccess("Estado eliminado correctamente");
+                await LoadStatuses();
+            }
+        }
+        catch (Exception ex)
+        {
+            HandleError($"Error al eliminar estado: {ex.Message}");
+        }
+    }
+
+    private async void ShowDeleteModal(int statusId)
+    {
+        statusIdToDelete = statusId;
+        await JSRuntime.InvokeVoidAsync("showModal", "deleteModal");
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (statusIdToDelete.HasValue)
+        {
+            await DeleteStatus(statusIdToDelete.Value);
+            await JSRuntime.InvokeVoidAsync("hideModal", "deleteModal");
+            statusIdToDelete = null;
+        }
+    }
+
+    private void HandleSuccess(string message)
+    {
+        successMessage = message;
+        errorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleError(string message)
+    {
+        errorMessage = message;
+        successMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddStatus();
+    }
+
+    private void HandleEditKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") SaveEdit();
+    }
 }
